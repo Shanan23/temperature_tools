@@ -1,92 +1,186 @@
-# Smart Room Controller with Fuzzy Logic
 
-This project demonstrates a smart room control system using NodeMCU with temperature and humidity sensors, a relay-controlled heater, fan, and USB humidifier. The system uses fuzzy logic to determine the optimal actions based on sensor readings. It also includes a web server to monitor and control devices via HTTP endpoints.
+# **Smart IoT Control System with Fuzzy Logic - Setup and API Documentation**
 
-## Features
-- **Temperature and Humidity Monitoring**: Uses DHT11 to measure the environment.
-- **Fuzzy Logic Control**: Makes decisions to activate heater, fan, or humidifier based on sensor data.
-- **Web Server**: Provides endpoints for real-time monitoring and device control.
-- **History Storage**: Maintains the last 5 sensor readings with timestamps.
-- **NTP Time Sync**: Ensures timestamps are accurate by syncing with NTP servers.
+## **Overview**
+This project uses NodeMCU (ESP8266) to control devices (heater, fan, humidifier) based on fuzzy logic applied to temperature and humidity readings. It includes Wi-Fi configuration (via AP mode or existing configuration) and provides a web-based API for remote control and monitoring.
 
-## Hardware Requirements
-- NodeMCU ESP8266
-- DHT11 Sensor
-- Relay Module
-  - Heater connected to Pin D6 (GPIO12)
-  - Fan connected to Pin D7 (GPIO13)
-  - Humidifier connected to Pin D8 (GPIO15)
-- USB Humidifier
-- Heater Device
-- Fan Device
-- Power Supply
+---
 
-## Software Requirements
-- MicroPython firmware for NodeMCU
-- Python Libraries:
-  - `dht`
-  - `machine`
-  - `time`
-  - `network`
-  - `socket`
-  - `ujson`
-  - `ntptime`
+## **Setup Instructions**
 
-## Circuit Diagram
-1. Connect the DHT11 sensor's data pin to GPIO14 (D5).
-2. Connect the relay module's control pins to GPIO12 (D6), GPIO13 (D7), and GPIO15 (D8) respectively.
-3. Ensure common ground between the NodeMCU and other components.
+### **1. Initial Power On**
+1. **First Boot Behavior**:
+   - If no Wi-Fi configuration file (`wifi_config.json`) exists, the device will automatically switch to Access Point (AP) mode.
+   - AP Credentials:
+     - SSID: `NodeMCU_AP`
+     - Password: `12345678`
+   - Connect your PC or mobile device to this network.
 
-## How It Works
-1. The system reads temperature and humidity from the DHT11 sensor.
-2. Fuzzy logic evaluates the sensor data to determine the appropriate action:
-   - Turn on the heater if the room is cold and dry.
-   - Turn on the fan if the room is hot and humid.
-   - Turn on the humidifier if the air is dry.
-3. Sensor data and actions are logged with timestamps.
-4. A web server exposes the following endpoints:
-   - `/sensor`: Returns the last 5 sensor readings.
-   - `/heater/on`: Activates the heater.
-   - `/fan/on`: Activates the fan.
-   - `/humidifier/on`: Activates the humidifier.
-   - `/off`: Deactivates all devices.
+2. **Access the Configuration Page**:
+   - Open a browser and navigate to `http://192.168.4.1` to access the web interface for Wi-Fi configuration.
 
-## Installation
-1. Flash MicroPython onto your NodeMCU.
-2. Upload the script to the board using an IDE like Thonny.
-3. Modify the `ssid` and `password` variables to match your Wi-Fi credentials.
-4. Run the script.
+---
 
-## Usage
-1. Power on the NodeMCU.
-2. Access the web server using the NodeMCU's IP address (shown in the serial monitor after successful Wi-Fi connection).
-3. Use a browser or tools like Postman to interact with the endpoints.
+### **2. Configuring Wi-Fi**
+1. Use the endpoint `/wifi` to configure Wi-Fi. 
+   - Submit `SSID` and `Password` via the query string. For example:
+     ```
+     http://192.168.4.1/wifi?ssid=YourSSID&password=YourPassword
+     ```
+2. Upon successful configuration:
+   - The Wi-Fi credentials are saved in `wifi_config.json`.
+   - Restart the device to connect to the configured Wi-Fi network.
 
-## Example Response
-### `/sensor` Endpoint Response:
-```json
-{
-  "Kelembaban": 75,
-  "Suhu": 27,
-  "History": [
-    {"Suhu": 25, "Kelembaban": 55, "Timestamp": "2024-12-25 14:32:10"},
-    {"Suhu": 24, "Kelembaban": 53, "Timestamp": "2024-12-25 14:35:15"},
-    {"Suhu": 23, "Kelembaban": 50, "Timestamp": "2024-12-25 14:38:20"},
-    {"Suhu": 26, "Kelembaban": 57, "Timestamp": "2024-12-25 14:41:25"},
-    {"Suhu": 27, "Kelembaban": 59, "Timestamp": "2024-12-25 14:44:30"}
-  ]
-}
-```
+---
 
-## Future Enhancements
-- Add support for more sensors like CO2 or motion detectors.
-- Implement MQTT for real-time updates.
-- Add a mobile-friendly web interface.
+### **3. Reset Wi-Fi Configuration**
+To reset the Wi-Fi configuration and return to AP mode:
+- Access the endpoint `/reset`:
+  ```
+  http://<device_ip>/reset
+  ```
+- The device will delete the `wifi_config.json` file and restart in AP mode.
 
-## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+---
 
-## Acknowledgments
-- MicroPython documentation and community for helpful resources.
-- OpenAI for assistance with code structuring and fuzzy logic implementation.
+### **4. Sync Time**
+The system syncs time using NTP to GMT+7 (WIB). Ensure the device is connected to the internet for accurate time synchronization.
 
+---
+
+### **5. Periodic Sensor Readings**
+Sensor readings (temperature and humidity) are automatically captured every 5 minutes and stored in the device's history (last 5 readings).
+
+---
+
+## **API Endpoints**
+
+### **1. Sensor Data**
+- **Endpoint**: `/sensor`
+- **Method**: `GET`
+- **Description**: Retrieves the current temperature, humidity, and the history of recent readings.
+- **Response**:
+  ```json
+  {
+    "Suhu": 28,
+    "Kelembaban": 65,
+    "History": [
+      {"Suhu": 27, "Kelembaban": 63, "Timestamp": "2024-12-29 08:10:00"},
+      {"Suhu": 28, "Kelembaban": 65, "Timestamp": "2024-12-29 08:15:00"}
+    ]
+  }
+  ```
+
+---
+
+### **2. Control Devices**
+#### **2.1 Turn On Heater**
+- **Endpoint**: `/heater/on`
+- **Method**: `GET`
+- **Description**: Turns on the heater and turns off other devices.
+- **Response**:
+  ```json
+  {
+    "message": "Heater turned on"
+  }
+  ```
+
+#### **2.2 Turn On Fan**
+- **Endpoint**: `/fan/on`
+- **Method**: `GET`
+- **Description**: Turns on the fan and turns off other devices.
+- **Response**:
+  ```json
+  {
+    "message": "Fan turned on"
+  }
+  ```
+
+#### **2.3 Turn On Humidifier**
+- **Endpoint**: `/humidifier/on`
+- **Method**: `GET`
+- **Description**: Turns on the humidifier and turns off other devices.
+- **Response**:
+  ```json
+  {
+    "message": "Humidifier turned on"
+  }
+  ```
+
+#### **2.4 Turn Off All Devices**
+- **Endpoint**: `/off`
+- **Method**: `GET`
+- **Description**: Turns off all connected devices.
+- **Response**:
+  ```json
+  {
+    "message": "Devices turned off"
+  }
+  ```
+
+---
+
+### **3. Wi-Fi Configuration**
+#### **3.1 Configure Wi-Fi**
+- **Endpoint**: `/wifi`
+- **Method**: `GET`
+- **Description**: Configures the Wi-Fi credentials for the device.
+- **Parameters**:
+  - `ssid`: The name of the Wi-Fi network.
+  - `password`: The password for the Wi-Fi network.
+- **Example**:
+  ```
+  http://192.168.4.1/wifi?ssid=YourSSID&password=YourPassword
+  ```
+- **Response**:
+  ```json
+  {
+    "message": "WiFi config saved. Restart device to connect."
+  }
+  ```
+
+#### **3.2 Reset Wi-Fi**
+- **Endpoint**: `/reset`
+- **Method**: `GET`
+- **Description**: Deletes the current Wi-Fi configuration and switches to AP mode.
+- **Response**:
+  ```json
+  {
+    "message": "WiFi config reset. AP mode activated."
+  }
+  ```
+
+---
+
+### **4. Time Synchronization**
+- The time is automatically synchronized with NTP upon boot.
+- The system adjusts to GMT+7 (WIB).
+
+---
+
+## **Debugging Tips**
+1. **Device not accessible**:
+   - Ensure the device is in AP mode and you are connected to `NodeMCU_AP`.
+   - Check the device's IP address (default is `192.168.4.1` in AP mode).
+
+2. **Wi-Fi connection fails**:
+   - Reconfigure Wi-Fi via the `/wifi` endpoint in AP mode.
+   - Check SSID and password for correctness.
+
+3. **Sensors not working**:
+   - Ensure the DHT sensor is properly connected to the designated GPIO pins.
+
+---
+
+## **Flow Summary**
+1. **First-Time Setup**:
+   - Connect to AP, configure Wi-Fi via `/wifi`.
+2. **Normal Operation**:
+   - Device connects to configured Wi-Fi and operates in STA mode.
+   - Access `/sensor` and control devices via endpoints.
+3. **Reconfiguration**:
+   - Reset Wi-Fi with `/reset` to return to AP mode for reconfiguration. 
+
+---
+
+Feel free to modify or extend this README as your project evolves! 🚀
