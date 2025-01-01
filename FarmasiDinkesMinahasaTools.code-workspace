@@ -3,6 +3,14 @@
 		{
 			"name": "FarmasiDinkesMinahasaTools",
 			"path": "."
+		},
+		{
+			"name": "serial://dev/tty.usbserial-1140",
+			"uri": "serial://%2fdev%2ftty.usbserial-1140/"
+		},
+		{
+			"name": "serial://dev/tty.usbserial-1140",
+			"uri": "serial://%2fdev%2ftty.usbserial-1140/"
 		}
 	]
 }
