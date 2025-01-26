@@ -1,8 +1,12 @@
 {
 	"folders": [
 		{
-			"name": "FarmasiDinkesMinahasaTools",
 			"path": "."
+		},
+		{
+			"name": "serial://dev/tty.usbserial-1130",
+			"uri": "serial:///dev/tty.usbserial-1130/"
 		}
-	]
+	],
+	"settings": {}
 }

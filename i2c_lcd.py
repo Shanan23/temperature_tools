@@ -1,48 +1,86 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-# This is a port of https://github.com/Seeed-Studio/Grove_LCD_RGB_Backlight
-# (c) 2017 Alex Bucknall <alex.bucknall@gmail.com>
+"""Implements a HD44780 character LCD connected via PCF8574 on I2C.
+   This was tested with: https://www.wemos.cc/product/d1-mini.html"""
 
-from machine import I2C, Pin
-import i2c_lcd_backlight
-import i2c_lcd_screen
+from lcd_api import LcdApi
+from time import sleep_ms
 
-class Display(object):
-    backlight = None
-    screen = None
+# The PCF8574 has a jumper selectable address: 0x20 - 0x27
+# Konfigurasi I2C
+I2C_SCL = 5  # Pin D1 pada NodeMCU
+I2C_SDA = 4  # Pin D2 pada NodeMCU
+I2C_ADDR = 0x20 # Alamat I2C PCF8574 (sesuaikan dengan perangkat Anda)
+I2C_FREQ = 100000 # Frekuensi I2C (400 kHz)
 
-    i2c = I2C(scl=Pin(5), sda=Pin(4))  # Pin I2C (SCL, SDA)
+# Defines shifts or masks for the various LCD line attached to the PCF8574
 
-    def __init__(self, i2c, lcd_addr=0x3e, rgb_addr=0x62):
-        self.backlight = i2c_lcd_backlight.Backlight(i2c, rgb_addr)
-        self.screen = i2c_lcd_screen.Screen(i2c, lcd_addr)
+MASK_RS = 0x01
+MASK_RW = 0x02
+MASK_E = 0x04
+SHIFT_BACKLIGHT = 3
+SHIFT_DATA = 4
 
-    def write(self, text):
-        self.screen.write(text)
+class I2cLcd(LcdApi):
+    """Implements a HD44780 character LCD connected via PCF8574 on I2C."""
 
-    def cursor(self, state):
-        self.screen.cursor(state)
+    def __init__(self, i2c, i2c_addr, num_lines, num_columns):
+        self.i2c = i2c
+        self.i2c_addr = i2c_addr
+        self.i2c.writeto(self.i2c_addr, bytearray([0]))
+        sleep_ms(20)   # Allow LCD time to powerup
+        # Send reset 3 times
+        self.hal_write_init_nibble(self.LCD_FUNCTION_RESET)
+        sleep_ms(5)    # need to delay at least 4.1 msec
+        self.hal_write_init_nibble(self.LCD_FUNCTION_RESET)
+        sleep_ms(1)
+        self.hal_write_init_nibble(self.LCD_FUNCTION_RESET)
+        sleep_ms(1)
+        # Put LCD into 4 bit mode
+        self.hal_write_init_nibble(self.LCD_FUNCTION)
+        sleep_ms(1)
+        LcdApi.__init__(self, num_lines, num_columns)
+        cmd = self.LCD_FUNCTION
+        if num_lines > 1:
+            cmd |= self.LCD_FUNCTION_2LINES
+        self.hal_write_command(cmd)
 
-    def blink(self, state):
-        self.screen.blink(state)
+    def hal_write_init_nibble(self, nibble):
+        """Writes an initialization nibble to the LCD.
 
-    def blinkLed(self):
-        self.backlight.blinkLed()
+        This particular function is only used during initialization.
+        
+        """
+        byte = ((nibble >> 4) & 0x0f) << SHIFT_DATA
+        self.i2c.writeto(self.i2c_addr, bytearray([byte | MASK_E]))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte]))
 
-    def autoscroll(self, state):
-        self.screen.autoscroll(state)
+    def hal_backlight_on(self):
+        """Allows the hal layer to turn the backlight on."""
+        self.i2c.writeto(self.i2c_addr, bytearray([1 << SHIFT_BACKLIGHT]))
 
-    def display(self, state):
-        self.screen.display(state)
+    def hal_backlight_off(self):
+        """Allows the hal layer to turn the backlight off."""
+        self.i2c.writeto(self.i2c_addr, bytearray([0]))
 
-    def clear(self):
-        self.screen.clear()
+    def hal_write_command(self, cmd):
+        """Writes a command to the LCD.
 
-    def home(self):
-        self.screen.home()
+        Data is latched on the falling edge of E.
+        """
+        byte = ((self.backlight << SHIFT_BACKLIGHT) | (((cmd >> 4) & 0x0f) << SHIFT_DATA))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte | MASK_E]))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte]))
+        byte = ((self.backlight << SHIFT_BACKLIGHT) | ((cmd & 0x0f) << SHIFT_DATA))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte | MASK_E]))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte]))
+        if cmd <= 3:
+            # The home and clear commands require a worst case delay of 4.1 msec
+            sleep_ms(5)
 
-    def color(self, r, g, b):
-        self.backlight.set_color(r, g, b)
-
-    def move(self, col, row):
-        self.screen.setCursor(col, row)
+    def hal_write_data(self, data):
+        """Write data to the LCD."""
+        byte = (MASK_RS | (self.backlight << SHIFT_BACKLIGHT) | (((data >> 4) & 0x0f) << SHIFT_DATA))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte | MASK_E]))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte]))
+        byte = (MASK_RS | (self.backlight << SHIFT_BACKLIGHT) | ((data & 0x0f) << SHIFT_DATA))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte | MASK_E]))
+        self.i2c.writeto(self.i2c_addr, bytearray([byte]))

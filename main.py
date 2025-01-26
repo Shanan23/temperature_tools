@@ -1,11 +1,15 @@
 import dht
-from machine import I2C, Pin, Timer
 import time
 import network
 import socket
 import ujson
 import ntptime
 import os
+import ssd1306
+from machine import I2C, Pin, Timer
+from i2c_lcd import I2cLcd, I2C_ADDR, I2C_SCL, I2C_SDA, I2C_FREQ
+from time import sleep_ms
+
 
 # Konfigurasi sensor DHT11 dan pin relay
 sensor = dht.DHT11(Pin(14))
@@ -15,11 +19,68 @@ humidifier_relay = Pin(15, Pin.OUT)
 
 history = []
 
+# Initialize I2C (SDA, SCL pins)
+i2c = I2C(scl=Pin(I2C_SCL), sda=Pin(I2C_SDA), freq=I2C_FREQ)
+
+# Function to scan all I2C addresses from 0x03 to 0x77
+def scan_all_i2c_addresses():
+    print("Scanning I2C addresses from 0x03 to 0x77...")
+    address = None
+    for i in range(3, 0x77):
+        try:
+            i2c.writeto(i, bytearray([0x00]))
+            address = i
+            print(f"Device found at address: {hex(i)}")
+        except OSError:
+            pass
+
+    if(address!=None):
+        try:
+            i2c.writeto(address, bytearray([0x00]))  # Send a dummy byte to the LCD
+            print("I2C write successful.")
+            sleep_ms(500)  # Give some time before sending other commands
+            
+            # Example of sending data (you can try sending a character or command)
+            try:
+                i2c.writeto(address, bytearray([0x01]))  # Command to clear the screen
+            except OSError as e:
+                print(f"2. Error while communicating with I2C device at {hex(address)}: {e}")
+            # sleep_ms(500)
+            try:
+                i2c.writeto(address, bytearray([0x02]))  # Set cursor position (if applicable)
+            except OSError as e:
+                print(f"3. Error while communicating with I2C device at {hex(address)}: {e}")
+            # sleep_ms(500)
+        except OSError as e:
+            print(f"Error writing to I2C device: {e}")
+
+# Fungsi utama untuk menampilkan teks
+def display_message(temp, humidity):
+    lcd.clear()  # Clear LCD screen
+    sleep_ms(1)
+    lcd.putstr("HELLO")  # Display temperature
+    sleep_ms(1)
+    lcd.move_to(0, 1)
+    sleep_ms(1)
+    lcd.putstr(f"Suhu: {temp}°C")  # Display temperature
+    sleep_ms(1)
+    lcd.move_to(0, 2)
+    sleep_ms(1)
+    lcd.putstr(f"Kelembaban: {humidity}%")  # Display humidity
+    sleep_ms(1)
+
+def periodic_read(t):
+    temp, humidity = read_sensor()
+    if temp is not None:
+        print(f"Suhu: {temp}°C, Kelembaban: {humidity}%")
+        display_message(temp, humidity)  # Perbarui tampilan LCD
+        # display_message()
+
 # Fungsi membaca data dari sensor
 def read_sensor():
     try:
         sensor.measure()
-        time.sleep(2)
+        sleep_ms(2000)
         temp = sensor.temperature()
         humidity = sensor.humidity()
 
@@ -108,7 +169,7 @@ def connect_wifi():
         if wifi.isconnected():
             print("Connected to WiFi:", wifi.ifconfig())
             return True
-        time.sleep(1)
+        sleep_ms(100)
 
     print("Failed to connect to WiFi. Switching to AP mode.")
     setup_ap_mode()
@@ -125,7 +186,7 @@ def setup_ap_mode():
 def sync_time():
     try:
         ntptime.settime()
-        print("Time synchronized")
+        print("Time synchronized ")
     except Exception as e:
         print("Failed to sync time:", e)
 
@@ -182,19 +243,38 @@ def start_webserver():
         cl.send(response_json)
         cl.close()
 
-# Fungsi Timer untuk pembacaan periodik
-def periodic_read(t):
-    temp, humidity = read_sensor()
-    if temp is not None:
-        print(f"Suhu: {temp}°C, Kelembaban: {humidity}%")
-
 # Program Utama
 if __name__ == "__main__":
+    read_sensor()
+    
+    # Call the function to scan all I2C addresses
+    scan_all_i2c_addresses()
+
+    # scan_all_i2c_addresses()
+    lcd = I2cLcd(i2c, I2C_ADDR, 4, 20)
+    lcd.clear()
+
+    sleep_ms(200)
+    lcd.move_to(0, 0)
+    lcd.putstr("Hello, World!")  # Display on the first line
+    sleep_ms(200)
+    lcd.move_to(0, 1)
+    lcd.putstr("LCD 20x4 Test")  # Display on the second line
+    sleep_ms(200)
+    lcd.move_to(0, 2)
+    lcd.putstr("Third Line")     # Display on the third line
+    sleep_ms(200)
+    lcd.move_to(0, 3)
+    lcd.putstr("Fourth Line")    # Display on the fourth line
+
+    print("LCD initialized")
+    sleep_ms(3000)
+    
     if not connect_wifi():
         setup_ap_mode()
     else:
         sync_time()
 
     timer = Timer(-1)
-    timer.init(period=300000, mode=Timer.PERIODIC, callback=periodic_read)
+    timer.init(period=10000, mode=Timer.PERIODIC, callback=periodic_read)
     start_webserver()
