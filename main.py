@@ -16,65 +16,107 @@ sensor = dht.DHT11(Pin(14))
 heater_relay = Pin(12, Pin.OUT)
 fan_relay = Pin(13, Pin.OUT)
 humidifier_relay = Pin(15, Pin.OUT)
+ssid = "NodeMCU_AP"
+password = "12345678"
+ipAddress = ""
+isShowSSID = True
 
 history = []
 
 # Initialize I2C (SDA, SCL pins)
 i2c = I2C(scl=Pin(I2C_SCL), sda=Pin(I2C_SDA), freq=I2C_FREQ)
 
+def fuzzy_tsukamoto(temp, humidity):
+    # Membership functions untuk suhu
+    dingin = max(0, min(1, (25 - temp) / (25 - 20)))
+    normal = max(0, min((temp - 20) / (25 - 20), (30 - temp) / (30 - 25)))
+    panas = max(0, min(1, (temp - 25) / (35 - 25)))
+    
+    # Membership functions untuk kelembaban
+    kering = max(0, min(1, (50 - humidity) / (50 - 30)))
+    sedang = max(0, min((humidity - 30) / (50 - 30), (70 - humidity) / (70 - 50)))
+    lembab = max(0, min(1, (humidity - 50) / (80 - 50)))
+    
+    # Inferensi berdasarkan aturan fuzzy
+    output_heater = min(dingin, kering)
+    output_fan = min(panas, lembab)
+    output_humidifier = min(dingin, sedang)
+    
+    # Defuzzifikasi dengan metode rata-rata terbobot
+    heater_value = output_heater * 100  # Skala 0-100
+    fan_value = output_fan * 100
+    humidifier_value = output_humidifier * 100
+    
+    return heater_value, fan_value, humidifier_value
+
+# Fungsi untuk mengontrol perangkat berdasarkan fuzzy logic
+def control_device_fuzzy(temp, humidity):
+    heater_val, fan_val, humidifier_val = fuzzy_tsukamoto(temp, humidity)
+    
+    if heater_val > 50:
+        heater_relay.on()
+    else:
+        heater_relay.off()
+    
+    if fan_val > 50:
+        fan_relay.on()
+    else:
+        fan_relay.off()
+    
+    if humidifier_val > 50:
+        humidifier_relay.on()
+    else:
+        humidifier_relay.off()
+
+    return heater_val, fan_val, humidifier_val
+
+
 # Function to scan all I2C addresses from 0x03 to 0x77
 def scan_all_i2c_addresses():
     print("Scanning I2C addresses from 0x03 to 0x77...")
-    address = None
-    for i in range(3, 0x77):
-        try:
-            i2c.writeto(i, bytearray([0x00]))
-            address = i
-            print(f"Device found at address: {hex(i)}")
-        except OSError:
-            pass
-
-    if(address!=None):
-        try:
-            i2c.writeto(address, bytearray([0x00]))  # Send a dummy byte to the LCD
-            print("I2C write successful.")
-            sleep_ms(500)  # Give some time before sending other commands
-            
-            # Example of sending data (you can try sending a character or command)
-            try:
-                i2c.writeto(address, bytearray([0x01]))  # Command to clear the screen
-            except OSError as e:
-                print(f"2. Error while communicating with I2C device at {hex(address)}: {e}")
-            # sleep_ms(500)
-            try:
-                i2c.writeto(address, bytearray([0x02]))  # Set cursor position (if applicable)
-            except OSError as e:
-                print(f"3. Error while communicating with I2C device at {hex(address)}: {e}")
-            # sleep_ms(500)
-        except OSError as e:
-            print(f"Error writing to I2C device: {e}")
+    devices = i2c.scan()
+    if devices:
+        print("I2C devices found at:")
+        for device in devices:
+            print(hex(device))
+    else:
+        print("No I2C devices found")
+        
 
 # Fungsi utama untuk menampilkan teks
-def display_message(temp, humidity):
+def display_message(temp, humidity, line3, line4):
+    if(isShowSSID):
+        showLine3 = "SSID: " + ssid
+        showLine4 = "Password: " + password
+    else:
+        showLine3 = line3
+        showLine4 = line4
     lcd.clear()  # Clear LCD screen
-    sleep_ms(1)
-    lcd.putstr("HELLO")  # Display temperature
-    sleep_ms(1)
-    lcd.move_to(0, 1)
     sleep_ms(1)
     lcd.putstr(f"Suhu: {temp}°C")  # Display temperature
     sleep_ms(1)
-    lcd.move_to(0, 2)
+    lcd.move_to(0, 1)
     sleep_ms(1)
     lcd.putstr(f"Kelembaban: {humidity}%")  # Display humidity
+    sleep_ms(1)
+    lcd.move_to(0, 2)
+    sleep_ms(1)
+    lcd.putstr(showLine3)  # Display 3rd line
+    sleep_ms(1)
+    sleep_ms(1)
+    lcd.move_to(0, 3)
+    sleep_ms(1)
+    lcd.putstr(showLine4)  # Display 4th line
     sleep_ms(1)
 
 def periodic_read(t):
     temp, humidity = read_sensor()
     if temp is not None:
         print(f"Suhu: {temp}°C, Kelembaban: {humidity}%")
+        heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity)  # Kontrol dengan fuzzy logic
+        line3 = f"x:${heater_value} y:${fan_value} z:${humidifier_value}"
+        line4 = "Fuzzy Logic"
         display_message(temp, humidity)  # Perbarui tampilan LCD
-        # display_message()
 
 # Fungsi membaca data dari sensor
 def read_sensor():
@@ -179,7 +221,7 @@ def connect_wifi():
 def setup_ap_mode():
     ap = network.WLAN(network.AP_IF)
     ap.active(True)
-    ap.config(essid="NodeMCU_AP", password="12345678")
+    ap.config(essid=ssid, password=password)
     print("AP Mode active:", ap.ifconfig())
 
 # Fungsi untuk sinkronisasi waktu menggunakan NTP

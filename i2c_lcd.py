@@ -8,7 +8,7 @@ from time import sleep_ms
 # Konfigurasi I2C
 I2C_SCL = 5  # Pin D1 pada NodeMCU
 I2C_SDA = 4  # Pin D2 pada NodeMCU
-I2C_ADDR = 0x20 # Alamat I2C PCF8574 (sesuaikan dengan perangkat Anda)
+I2C_ADDR = 0x27 # Alamat I2C PCF8574 (sesuaikan dengan perangkat Anda)
 I2C_FREQ = 100000 # Frekuensi I2C (400 kHz)
 
 # Defines shifts or masks for the various LCD line attached to the PCF8574
