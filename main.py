@@ -82,15 +82,34 @@ def scan_all_i2c_addresses():
     else:
         print("No I2C devices found")
         
+def running_text_lines(line3, line4, lcd, delay=300):
+    """
+    Menjalankan scrolling text hanya jika panjang teks > 20 karakter
+    :param line3: String untuk baris ke-3
+    :param line4: String untuk baris ke-4
+    :param lcd: Object LCD
+    :param delay: Delay scrolling dalam milidetik (ms)
+    """
+    lcd.move_to(0, 2)
+    lcd.putstr(line3[:20])  # Tampilkan teks statis jika <= 20
+    lcd.move_to(0, 3)
+    lcd.putstr(line4[:20])  # Tampilkan teks statis jika <= 20
+
+    # Jalankan scrolling hanya jika panjang teks lebih dari 20
+    if len(line3) > 20 or len(line4) > 20:
+        padding = " " * 20  # Padding untuk efek scrolling
+        text3 = (padding + line3 + padding) if len(line3) > 20 else line3
+        text4 = (padding + line4 + padding) if len(line4) > 20 else line4
+
+        for i in range(max(len(text3), len(text4)) - 19):  # Scroll hanya jika perlu
+            lcd.move_to(0, 2)
+            lcd.putstr(text3[i:i+20]) if len(line3) > 20 else None
+            lcd.move_to(0, 3)
+            lcd.putstr(text4[i:i+20]) if len(line4) > 20 else None
+            sleep_ms(delay)
 
 # Fungsi utama untuk menampilkan teks
 def display_message(temp, humidity, line3, line4):
-    if(isShowSSID):
-        showLine3 = "SSID: " + ssid
-        showLine4 = "Password: " + password
-    else:
-        showLine3 = line3
-        showLine4 = line4
     lcd.clear()  # Clear LCD screen
     sleep_ms(1)
     lcd.putstr(f"Suhu: {temp}°C")  # Display temperature
@@ -99,32 +118,28 @@ def display_message(temp, humidity, line3, line4):
     sleep_ms(1)
     lcd.putstr(f"Kelembaban: {humidity}%")  # Display humidity
     sleep_ms(1)
-    lcd.move_to(0, 2)
-    sleep_ms(1)
-    lcd.putstr(showLine3)  # Display 3rd line
-    sleep_ms(1)
-    sleep_ms(1)
-    lcd.move_to(0, 3)
-    sleep_ms(1)
-    lcd.putstr(showLine4)  # Display 4th line
-    sleep_ms(1)
+    running_text_lines(line3, line4, lcd)  # Display running text
+    
 
 def periodic_read(t):
     temp, humidity = read_sensor()
     if temp is not None:
         print(f"Suhu: {temp}°C, Kelembaban: {humidity}%")
         heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity)  # Kontrol dengan fuzzy logic
-        line3 = f"x:${heater_value} y:${fan_value} z:${humidifier_value}"
-        line4 = "Fuzzy Logic"
-        display_message(temp, humidity)  # Perbarui tampilan LCD
+        line3 = f"heater_val:{heater_val} fan_val:{fan_val} humidifier_val:{humidifier_val}"
+        line4 = "IP: " + ipAddress
+        if(isShowSSID):
+            line4 = "ssid: " + ssid +", pwd: " + password
+        display_message(temp, humidity, line3, line4)  # Perbarui tampilan LCD
+    else:
+        print("Failed to read sensor")
+        line4 = "IP: " + ipAddress
+        display_message(0, 0,"Failed to read sensor", line4)  # Perbarui tampilan LCD
+
 
 # Fungsi membaca data dari sensor
 def read_sensor():
     try:
-        sensor.measure()
-        sleep_ms(2000)
-        temp = sensor.temperature()
-        humidity = sensor.humidity()
 
         # Tambahkan data ke history
         ntptime.settime()  # Waktu UTC
@@ -137,6 +152,11 @@ def read_sensor():
         formatted_time = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
             local_time[0], local_time[1], local_time[2], local_time[3], local_time[4], local_time[5]
         )
+
+        sensor.measure()
+        sleep_ms(2000)
+        temp = sensor.temperature()
+        humidity = sensor.humidity()
 
         history.append({"Suhu": temp, "Kelembaban": humidity, "Timestamp": formatted_time})
         if len(history) > 5:
@@ -205,13 +225,19 @@ def connect_wifi():
 
     wifi = network.WLAN(network.STA_IF)
     wifi.active(True)
-    wifi.connect(ssid, password)
+    wifi.disconnect()
+    sleep_ms(500)
+    print(f"wifi_config:{ssid}:{password}:")
 
-    for _ in range(10):
+    wifi.connect(ssid, password)
+    for i in range(10):
         if wifi.isconnected():
-            print("Connected to WiFi:", wifi.ifconfig())
+            print("Terhubung ke WiFi:", wifi.ifconfig())
+            print("Terhubung ke WiFi:", wifi.ifconfig()[0])
+        
             return True
-        sleep_ms(100)
+        print(f"Koneksi gagal, percobaan ke-{i+1}")  # Debug log
+        sleep_ms(1000)
 
     print("Failed to connect to WiFi. Switching to AP mode.")
     setup_ap_mode()
@@ -298,24 +324,29 @@ if __name__ == "__main__":
 
     sleep_ms(200)
     lcd.move_to(0, 0)
-    lcd.putstr("Hello, World!")  # Display on the first line
+    lcd.putstr("Welcome")  # Display on the first line
     sleep_ms(200)
     lcd.move_to(0, 1)
-    lcd.putstr("LCD 20x4 Test")  # Display on the second line
+    lcd.putstr("")  # Display on the second line
     sleep_ms(200)
     lcd.move_to(0, 2)
-    lcd.putstr("Third Line")     # Display on the third line
+    lcd.putstr("initialize sensor")     # Display on the third line
     sleep_ms(200)
     lcd.move_to(0, 3)
-    lcd.putstr("Fourth Line")    # Display on the fourth line
+    lcd.putstr("initialize wifi")     # Display on the third line
+    sleep_ms(200)
 
     print("LCD initialized")
     sleep_ms(3000)
-    
+
     if not connect_wifi():
         setup_ap_mode()
     else:
         sync_time()
+
+    wifi = network.WLAN(network.STA_IF)
+    isShowSSID = False
+    ipAddress = f"{wifi.ifconfig()[0]}"
 
     timer = Timer(-1)
     timer.init(period=10000, mode=Timer.PERIODIC, callback=periodic_read)
