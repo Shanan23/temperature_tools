@@ -13,11 +13,11 @@ from time import sleep_ms
 
 # Konfigurasi sensor DHT11 dan pin relay
 sensor = dht.DHT11(Pin(14))
-heater_relay = Pin(12, Pin.OUT)
-fan_relay = Pin(13, Pin.OUT)
-humidifier_relay = Pin(15, Pin.OUT)
+heater_relay = Pin(12, Pin.OUT) # D6 relay 2
+fan_relay = Pin(13, Pin.OUT) # D7 relay 3
+humidifier_relay = Pin(15, Pin.OUT) # D8 relay 4
 ssid = "NodeMCU_AP"
-password = "12345678"
+password = "1234567"
 ipAddress = ""
 isShowSSID = True
 
@@ -55,18 +55,18 @@ def control_device_fuzzy(temp, humidity):
     
     if heater_val > 50:
         heater_relay.on()
-    else:
-        heater_relay.off()
+    # else:
+    #     heater_relay.off()
     
     if fan_val > 50:
         fan_relay.on()
-    else:
-        fan_relay.off()
+    # else:
+    #     fan_relay.off()
     
     if humidifier_val > 50:
         humidifier_relay.on()
-    else:
-        humidifier_relay.off()
+    # else:
+    #     humidifier_relay.off()
 
     return heater_val, fan_val, humidifier_val
 
@@ -128,8 +128,10 @@ def periodic_read(t):
         heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity)  # Kontrol dengan fuzzy logic
         line3 = f"heater_val:{heater_val} fan_val:{fan_val} humidifier_val:{humidifier_val}"
         line4 = "IP: " + ipAddress
+        
         if(isShowSSID):
             line4 = "ssid: " + ssid +", pwd: " + password
+        
         display_message(temp, humidity, line3, line4)  # Perbarui tampilan LCD
     else:
         print("Failed to read sensor")
@@ -154,7 +156,6 @@ def read_sensor():
         )
 
         sensor.measure()
-        sleep_ms(2000)
         temp = sensor.temperature()
         humidity = sensor.humidity()
 
@@ -171,15 +172,15 @@ def read_sensor():
 def control_device(action):
     if action == "Heater":
         heater_relay.on()
-        fan_relay.off()
-        humidifier_relay.off()
+        # fan_relay.off()
+        # humidifier_relay.off()
     elif action == "Fan":
-        heater_relay.off()
+        # heater_relay.off()
         fan_relay.on()
-        humidifier_relay.off()
+        # humidifier_relay.off()
     elif action == "Humidifier":
-        heater_relay.off()
-        fan_relay.off()
+        # heater_relay.off()
+        # fan_relay.off()
         humidifier_relay.on()
     else:
         heater_relay.off()
@@ -260,14 +261,19 @@ def sync_time():
 
 # Fungsi Web Server
 def start_webserver():
-    addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
+    addr = socket.getaddrinfo('0.0.0.0', 1234)[0][-1]
     s = socket.socket()
     s.bind(addr)
     s.listen(1)
     print('Web server running at:', addr)
 
     while True:
-        cl, addr = s.accept()
+        s.settimeout(10)  # Timeout 10 detik
+        try:
+            cl, addr = s.accept()
+        except OSError as e:
+            print("Timeout pada accept()", e)
+            continue
         request = cl.recv(1024).decode()
         print('Request:', request)
 
@@ -279,13 +285,13 @@ def start_webserver():
                 "Kelembaban": humidity,
                 "History": history
             } if temp is not None else {"error": "Unable to read sensor"}
-        elif '/heater/on' in request:
+        elif '/d6' in request:
             control_device("Heater")
             response = {"message": "Heater turned on"}
-        elif '/fan/on' in request:
+        elif '/d7' in request:
             control_device("Fan")
             response = {"message": "Fan turned on"}
-        elif '/humidifier/on' in request:
+        elif '/d8' in request:
             control_device("Humidifier")
             response = {"message": "Humidifier turned on"}
         elif '/off' in request:
@@ -307,8 +313,12 @@ def start_webserver():
             response = {"error": "Invalid endpoint"}
 
         response_json = ujson.dumps(response)
-        cl.send('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n')
-        cl.send(response_json)
+        
+        print('Response:', response_json)
+        
+        cl.sendall('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n'.encode())
+        cl.sendall(response_json.encode())
+        
         cl.close()
 
 # Program Utama
@@ -336,9 +346,6 @@ if __name__ == "__main__":
     lcd.putstr("initialize wifi")     # Display on the third line
     sleep_ms(200)
 
-    print("LCD initialized")
-    sleep_ms(3000)
-
     if not connect_wifi():
         setup_ap_mode()
     else:
@@ -349,5 +356,6 @@ if __name__ == "__main__":
     ipAddress = f"{wifi.ifconfig()[0]}"
 
     timer = Timer(-1)
-    timer.init(period=10000, mode=Timer.PERIODIC, callback=periodic_read)
+    timer.init(period=30000, mode=Timer.PERIODIC, callback=periodic_read)
     start_webserver()
+    print("Web server started at:", ipAddress)
