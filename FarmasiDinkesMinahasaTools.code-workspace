@@ -4,8 +4,16 @@
 			"path": "."
 		},
 		{
+			"name": "serial://dev/tty.usbserial-1120",
+			"uri": "serial:///dev/tty.usbserial-1120/"
+		},
+		{
 			"name": "serial://dev/tty.usbserial-1130",
 			"uri": "serial:///dev/tty.usbserial-1130/"
+		},
+		{
+			"name": "serial://dev/tty.usbserial-11120",
+			"uri": "serial://%2fdev%2ftty.usbserial-11120"
 		}
 	],
 	"settings": {}
