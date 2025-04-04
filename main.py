@@ -11,7 +11,11 @@ from web_server import start_webserver
 import ntptime  # Importing ntptime to fix the synchronization issue
 import urequests  # Importing urequests for HTTP requests
 import ujson  # Importing ujson for JSON handling
+# import logging  # Importing logging for logging functionality
 import gc  # Importing garbage collector
+from i2c_lcd import I2cLcd, I2C_ADDR, I2C_SCL, I2C_SDA, I2C_FREQ
+
+# Optimize imports by removing unused ones
 
 import ufirebase as firebase
 
@@ -34,7 +38,7 @@ password = config.get("password")
 ipAddress = ""
 isShowSSID = True
 try:
-    timer_period = int(config.get("period", 30000))
+    timer_period = int(config.get("period", 60000))  # Increased timer period to reduce memory usage
 except ValueError:
     print("Invalid value for period in configuration. Using default of 30000.")
     timer_period = 30000
@@ -76,8 +80,9 @@ def running_text_lines(line3, line4, lcd, delay=300):
 
 # Fungsi utama untuk menampilkan teks
 def display_message(temp, humidity, line3, line4):
-    lcd.clear()  # Clear LCD screen
-    gc.collect()  # Trigger garbage collection
+    if lcd is not None:  # Only clear LCD if initialized
+        lcd.clear()  # Clear LCD screen
+        gc.collect()  # Trigger garbage collection
     sleep_ms(1)
     lcd.putstr(f"Suhu: {temp}°C")  # Display temperature
     sleep_ms(1)
@@ -90,13 +95,14 @@ def display_message(temp, humidity, line3, line4):
 def periodic_read(t):
     global stop_script  # Ensure stop_script is recognized as a global variable
     if not stop_script:  # Check if the script should continue running
+        gc.collect()  # Trigger garbage collection to free up memory
         try:
             temp, humidity = read_sensor()
             if temp is not None:
                 print(f"Suhu: {temp}°C, Kelembaban: {humidity}%")
                 heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity)  # Kontrol dengan fuzzy logic
                 print(f"Heater Value: {heater_val}, Fan Value: {fan_val}, Humidifier Value: {humidifier_val}")
-                line3 = f"heater_val:{heater_val} fan_val:{fan_val} humidifier_val:{humidifier_val}"
+                line3 = f"HV: {heater_val} FV: {fan_val} HV: {humidifier_val}"  # Shortened variable names for display
                 line4 = "IP: " + ipAddress
                 
                 if(isShowSSID):
@@ -169,7 +175,7 @@ def connect_wifi():
             print("Gateway:", gateway)
 
             data = '{"ip": "' + ip + '"}'
-            urequests.put(FIREBASE_URL, data=data)
+            # urequests.put(FIREBASE_URL, data=data)
             print(f"IP {ip} tersimpan di Firebase")
             return True
         print(f"Koneksi gagal, percobaan ke-{i+1}")  # Debug log
@@ -197,19 +203,23 @@ def sync_time():
     except Exception as e:
         print("Failed to sync time:", e)
 
-FIREBASE_URL = config.get("firebase_url", "https://temperatureapp-94d6a.firebaseio.com/")  # Firebase URL from config
+FIREBASE_URL = config.get("firebase_url", "http://temperatureapp-94d6a.firebaseio.com/")  # Firebase URL from config
 
 def send_data_to_firebase(temp, humidity, timestamp):
-    data = {
+    print(f"Sending data to Firebase: Temperature: {temp}, Humidity: {humidity}")  # Log data being sent
+    data = { 
         "timestamp": timestamp,
         "suhu": temp,
         "kelembaban": humidity
     }
-    firebase.setURL(FIREBASE_URL) # Set Firebase URL
-    firebase.put("history", ujson.dumps(data))  # Send data to Firebase
-    # response = urequests.put(FIREBASE_URL, data=ujson.dumps(data), headers=headers)
-    # print("Response:", response.text)
-    # response.close()
+    
+    firebase.setURL(FIREBASE_URL)  # Set Firebase URL
+    gc.collect()  # Trigger garbage collection after sending data
+    try:
+        firebase.put("history", ujson.dumps(data))  # Send data to Firebase
+        print(f"Data sent to Firebase: {data}")  # Print successful data send
+    except Exception as e:
+        print(f"Failed to send data to Firebase: {e}")  # Print any errors
 
 # Program Utama
 if __name__ == "__main__":
@@ -262,3 +272,4 @@ if __name__ == "__main__":
 
     start_webserver()
     print("Web server started at:", ipAddress)
+</create_file>

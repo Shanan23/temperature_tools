@@ -3,7 +3,8 @@ import ujson
 from device_control import relay  # Import the relay function
 from sensor_handler import read_sensor
 
-def start_webserver():  
+def start_webserver():
+    global last_temp, last_humidity  # Declare global variables to store last readings
     addr = socket.getaddrinfo('0.0.0.0', 1234)[0][-1]
     s = socket.socket()
     s.bind(addr)
