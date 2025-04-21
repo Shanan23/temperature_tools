@@ -40,15 +40,17 @@ def start_webserver():
             try:
                 ssid = request.split("ssid=")[1].split("&")[0]
                 password = request.split("password=")[1].split(" ")[0]
-                with open("config.txt", "w") as f:
-                    f.write(f"[WIFI]\nssid={ssid}\npassword={password}\n")
+                with open("setting.ini", "w") as f:
+                    f.write(f"[WIFI]\nssid={ssid}\npassword={password}\n[TIMER]\nperiod=10000\n")
+
+                print("Config saved.")
                 response = {"message": "WiFi config saved. Restart device to connect."}
             except Exception as e:
                 response = {"error": "Invalid WiFi config"}
         elif '/timer' in request and 'period=' in request:
             try:
                 period = int(request.split("period=")[1].split(" ")[0])
-                with open("config.txt", "a") as f:
+                with open("setting.ini", "a") as f:
                     f.write(f"[TIMER]\nperiod={period}\n")
                 response = {"message": f"Timer period updated to {period}ms"}
             except Exception as e:

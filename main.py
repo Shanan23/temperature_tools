@@ -11,13 +11,8 @@ from web_server import start_webserver
 import ntptime  # Importing ntptime to fix the synchronization issue
 import urequests  # Importing urequests for HTTP requests
 import ujson  # Importing ujson for JSON handling
-# import logging  # Importing logging for logging functionality
 import gc  # Importing garbage collector
 from i2c_lcd import I2cLcd, I2C_ADDR, I2C_SCL, I2C_SDA, I2C_FREQ
-
-# Optimize imports by removing unused ones
-
-import ufirebase as firebase
 
 # Load configuration
 def load_config():
@@ -29,7 +24,7 @@ def load_config():
                     key, value = line.strip().split('=')
                     config[key] = value
     except Exception as e:
-        print("Error loading config:", e)
+        print(f"Error loading config: {e}")
     return config
 
 config = load_config()
@@ -37,11 +32,12 @@ ssid = config.get("ssid")
 password = config.get("password")
 ipAddress = ""
 isShowSSID = True
+
 try:
-    timer_period = int(config.get("period", 60000))  # Increased timer period to reduce memory usage
+    timer_period = int(config.get("period", 10000))  # Increased timer period to reduce memory usage
 except ValueError:
     print("Invalid value for period in configuration. Using default of 30000.")
-    timer_period = 30000
+    timer_period = 10000
 
 # Initialize I2C (SDA, SCL pins)
 i2c = I2C(scl=Pin(I2C_SCL), sda=Pin(I2C_SDA), freq=I2C_FREQ)
@@ -110,8 +106,8 @@ def periodic_read(t):
                 
                 if lcd is not None:  # Only update LCD if initialized
                     display_message(temp, humidity, line3, line4)  # Perbarui tampilan LCD
-                
-                send_data_to_firebase(temp, humidity, ntptime.time())  # Send data to Firebase
+                fetch_api_config()
+                send_to_ngrok(temp, humidity, ntptime.time())  # Send data to ngrok endpoint
             else:
                 print("Failed to read sensor")
                 line4 = "IP: " + ipAddress
@@ -143,19 +139,48 @@ def save_wifi_config(ssid, password):
     except Exception as e:
         print("Could not save WiFi config:", e)
 
-# Fungsi untuk menghapus file konfigurasi WiFi
-def reset_wifi_config():
-    try:
-        if "wifi_config.json" in os.listdir():
-            os.remove("wifi_config.json")
-            print("WiFi config reset. File deleted.")
-    except Exception as e:
-        print("Error resetting WiFi config:", e)
-
 # Fungsi koneksi WiFi
+def fetch_api_config():
+    ngrok_url = "http://closing-stinkbug-lucky.ngrok-free.app/sensor/firebase/config"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Connection": "close"
+    }
+    
+    try:
+        response = urequests.get(ngrok_url, headers=headers)
+        print(f"Status: {response.status_code}")
+
+        if response.status_code == 200:
+            print("Raw response content:", response.content)
+            print("Response text:", response.text)
+
+            if response.text:
+                config = ujson.loads(response.text)
+                with open("setting.ini", "w") as f:
+                    for key, value in config.items():
+                        f.write(f"{key}={value}\n")
+                print("Config saved.")
+                # Reset the timer with the new period
+                if timer is not None:  # Ensure timer is initialized
+                    timer_period = int(config.get("period", 60000))  # Update timer_period
+                    timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)  # Reset the timer
+            else:
+                print("Empty response text. Nothing to save.")
+        else:
+            print("Non-200 response")
+    except Exception as e:
+        print("Error fetching config:", e)
+    finally:
+        if response:
+            response.close()
+
 def connect_wifi():
-    ssid, password = load_wifi_config()
-    if not ssid or not password:
+    global config, ssid, password, timer_period  # Declare globals at start
+    
+    current_ssid, current_password = load_wifi_config()
+    if not current_ssid or not current_password:
         print("WiFi config not found. Switching to AP mode.")
         setup_ap_mode()
         return False
@@ -164,19 +189,16 @@ def connect_wifi():
     wifi.active(True)
     wifi.disconnect()
     sleep_ms(500)
-    print(f"wifi_config:{ssid}:{password}:")
+    print(f"wifi_config:{current_ssid}:{current_password}:")
 
-    wifi.connect(ssid, password)
+    wifi.connect(current_ssid, current_password)
     for i in range(10):
         if wifi.isconnected():
             ip, _, gateway, _ = wifi.ifconfig()
             print("Connected to WiFi")
             print("IP Address:", ip)
             print("Gateway:", gateway)
-
-            data = '{"ip": "' + ip + '"}'
-            # urequests.put(FIREBASE_URL, data=data)
-            print(f"IP {ip} tersimpan di Firebase")
+                
             return True
         print(f"Koneksi gagal, percobaan ke-{i+1}")  # Debug log
         sleep_ms(1000)
@@ -190,7 +212,8 @@ def setup_ap_mode():
     ap = network.WLAN(network.AP_IF)
     ap.active(True)
     try:
-        ap.config(essid=ssid, password=password)
+        ap.config(essid="NodeMCU_AP", password="12345678")
+        print(f"ssid={"NodeMCU_AP"}, password={"12345678"}")
         print("AP Mode active:", ap.ifconfig())
     except OSError as e:
         print("Error setting AP config:", e)
@@ -203,23 +226,25 @@ def sync_time():
     except Exception as e:
         print("Failed to sync time:", e)
 
-FIREBASE_URL = config.get("firebase_url", "http://temperatureapp-94d6a.firebaseio.com/")  # Firebase URL from config
-
-def send_data_to_firebase(temp, humidity, timestamp):
-    print(f"Sending data to Firebase: Temperature: {temp}, Humidity: {humidity}")  # Log data being sent
-    data = { 
+def send_to_ngrok(temp, humidity, timestamp):
+    ngrok_url = "http://closing-stinkbug-lucky.ngrok-free.app/sensor/firebase/history"
+    data = {
         "timestamp": timestamp,
-        "suhu": temp,
-        "kelembaban": humidity
+        "temperature": temp,
+        "humidity": humidity
     }
+    headers = {"Content-Type": "application/json"}
     
-    firebase.setURL(FIREBASE_URL)  # Set Firebase URL
-    gc.collect()  # Trigger garbage collection after sending data
     try:
-        firebase.put("history", ujson.dumps(data))  # Send data to Firebase
-        print(f"Data sent to Firebase: {data}")  # Print successful data send
+        response = urequests.post(
+            ngrok_url,
+            headers=headers,
+            data=ujson.dumps(data)
+        )
+        print(f"Data sent to ngrok: {data}, Status: {response.status_code}")
+        response.close()
     except Exception as e:
-        print(f"Failed to send data to Firebase: {e}")  # Print any errors
+        print(f"Failed to send to ngrok: {e}")
 
 # Program Utama
 if __name__ == "__main__":
@@ -249,17 +274,30 @@ if __name__ == "__main__":
         lcd.move_to(0, 3)
         lcd.putstr("initialize wifi")     # Display on the third line
         sleep_ms(200)
+    timer = Timer(-1)
 
     if not connect_wifi(): 
         setup_ap_mode()  # Switch to AP mode if WiFi config is not found
     else:
         sync_time()
 
+        # Fetch and save API config after successful connection
+        fetch_api_config()
+        
+        # Reload config with new values
+        config = load_config()
+        ssid = config.get("ssid")
+        password = config.get("password")
+        try:
+            timer_period = int(config.get("period", 60000))
+        except ValueError:
+            timer_period = 30000
+
+
     wifi = network.WLAN(network.STA_IF)
     isShowSSID = False
     ipAddress = f"{wifi.ifconfig()[0]}"
 
-    timer = Timer(-1)
     timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)
     gc.collect()  # Trigger garbage collection after setting up the timer
     
@@ -272,4 +310,3 @@ if __name__ == "__main__":
 
     start_webserver()
     print("Web server started at:", ipAddress)
-</create_file>
