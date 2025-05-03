@@ -141,7 +141,7 @@ def save_wifi_config(ssid, password):
 
 # Fungsi koneksi WiFi
 def fetch_api_config():
-    ngrok_url = "http://closing-stinkbug-lucky.ngrok-free.app/sensor/firebase/config"
+    ngrok_url = "http://api.nahsbyte.my.id/sensor/firebase/config"
 
     headers = {
         "Content-Type": "application/json",
@@ -227,7 +227,7 @@ def sync_time():
         print("Failed to sync time:", e)
 
 def send_to_ngrok(temp, humidity, timestamp):
-    ngrok_url = "http://closing-stinkbug-lucky.ngrok-free.app/sensor/firebase/history"
+    ngrok_url = "http://api.nahsbyte.my.id/sensor/firebase/history"
     data = {
         "timestamp": timestamp,
         "temperature": temp,

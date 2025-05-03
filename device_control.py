@@ -24,3 +24,25 @@ def control_device_fuzzy(temp, humidity):
         humidifier_relay.off()
 
     return heater_val, fan_val, humidifier_val
+
+def relay(device_name, action):
+    """
+    Manually control the device relay.
+    device_name: 'heater', 'fan', or 'humidifier'
+    action: 'on' or 'off'
+    """
+    if device_name == 'heater':
+        if action == 'on':
+            heater_relay.on()
+        elif action == 'off':
+            heater_relay.off()
+    elif device_name == 'fan':
+        if action == 'on':
+            fan_relay.on()
+        elif action == 'off':
+            fan_relay.off()
+    elif device_name == 'humidifier':
+        if action == 'on':
+            humidifier_relay.on()
+        elif action == 'off':
+            humidifier_relay.off()
