@@ -25,7 +25,7 @@ This project uses NodeMCU (ESP8266) to control devices (heater, fan, humidifier)
 1. Use the endpoint `/wifi` to configure Wi-Fi. 
    - Submit `SSID` and `Password` via the query string. For example:
      ```
-     http://192.168.4.1/wifi?ssid=YourSSID&password=YourPassword
+     http://192.168.4.1:1234/wifi?ssid=YourSSID&password=YourPassword
      ```
 2. Upon successful configuration:
    - The Wi-Fi credentials are saved in `wifi_config.json`.
