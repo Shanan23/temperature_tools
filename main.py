@@ -118,6 +118,12 @@ def periodic_read(t):
         except Exception as e:
             print(f"An error occurred: {e}")
 
+def periodic_fetch_config(t):
+    try:
+        fetch_api_config()
+    except Exception as e:
+        print(f"Error in periodic config fetch: {e}")
+
 # Fungsi untuk memeriksa file konfigurasi WiFi
 def load_wifi_config():
     try:
@@ -274,7 +280,10 @@ if __name__ == "__main__":
         lcd.move_to(0, 3)
         lcd.putstr("initialize wifi")     # Display on the third line
         sleep_ms(200)
-    timer = Timer(-1)
+    
+    # Create two separate timers
+    sensor_timer = Timer(-1)
+    config_timer = Timer(-1)
 
     if not connect_wifi(): 
         setup_ap_mode()  # Switch to AP mode if WiFi config is not found
@@ -293,13 +302,14 @@ if __name__ == "__main__":
         except ValueError:
             timer_period = 30000
 
-
     wifi = network.WLAN(network.STA_IF)
     isShowSSID = False
     ipAddress = f"{wifi.ifconfig()[0]}"
 
-    timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)
-    gc.collect()  # Trigger garbage collection after setting up the timer
+    # Initialize both timers with different periods
+    sensor_timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)
+    config_timer.init(period=60000, mode=Timer.PERIODIC, callback=periodic_fetch_config)  # 1 minute interval
+    gc.collect()  # Trigger garbage collection after setting up the timers
     
     # Add a mechanism to handle the stopScript command
     stop_script = False  # Flag to control the script execution
