@@ -32,6 +32,9 @@ ssid = config.get("ssid")
 password = config.get("password")
 ipAddress = ""
 isShowSSID = True
+manual_temp = config.get("manual_temp", 0)
+manual_humidity = config.get("manual_humidity", 0)
+is_periodic_sensor = config.get("is_periodic_sensor", "false").lower() == "true"
 
 try:
     timer_period = int(config.get("period", 10000))  # Increased timer period to reduce memory usage
@@ -107,7 +110,9 @@ def periodic_read(t):
                 if lcd is not None:  # Only update LCD if initialized
                     display_message(temp, humidity, line3, line4)  # Perbarui tampilan LCD
                 fetch_api_config()
-                send_to_ngrok(temp, humidity, ntptime.time())  # Send data to ngrok endpoint
+                if(is_periodic_sensor):
+                    print("Sending periodic sensor data to API")
+                    send_to_api(temp, humidity, ntptime.time(), is_periodic_sensor)  # Send data to ngrok endpoint
             else:
                 print("Failed to read sensor")
                 line4 = "IP: " + ipAddress
@@ -147,6 +152,7 @@ def save_wifi_config(ssid, password):
 
 # Fungsi koneksi WiFi
 def fetch_api_config():
+    global config
     api_url = "http://api.nahsbyte.my.id/sensor/firebase/config"
 
     headers = {
@@ -172,6 +178,8 @@ def fetch_api_config():
                 if sensor_timer is not None:  # Ensure timer is initialized
                     timer_period = int(config.get("period", 60000))  # Update timer_period
                     sensor_timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)  # Reset the timer
+                # Update global config dictionary with new values
+                config = config
             else:
                 print("Empty response text. Nothing to save.")
         else:
@@ -232,12 +240,15 @@ def sync_time():
     except Exception as e:
         print("Failed to sync time:", e)
 
-def send_to_ngrok(temp, humidity, timestamp):
+def send_to_api(temp, humidity, timestamp, is_periodic_sensor=False):
     api_url = "http://api.nahsbyte.my.id/sensor/firebase/history"
     data = {
         "timestamp": timestamp,
         "temperature": temp,
-        "humidity": humidity
+        "humidity": humidity,
+        "is_periodic_sensor": is_periodic_sensor,
+        "manual_temp": manual_temp,
+        "manual_humidity": manual_humidity
     }
     headers = {"Content-Type": "application/json"}
     
