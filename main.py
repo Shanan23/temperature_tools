@@ -147,7 +147,7 @@ def save_wifi_config(ssid, password):
 
 # Fungsi koneksi WiFi
 def fetch_api_config():
-    ngrok_url = "http://api.nahsbyte.my.id/sensor/firebase/config"
+    api_url = "http://api.nahsbyte.my.id/sensor/firebase/config"
 
     headers = {
         "Content-Type": "application/json",
@@ -155,7 +155,7 @@ def fetch_api_config():
     }
     
     try:
-        response = urequests.get(ngrok_url, headers=headers)
+        response = urequests.get(api_url, headers=headers)
         print(f"Status: {response.status_code}")
 
         if response.status_code == 200:
@@ -169,9 +169,9 @@ def fetch_api_config():
                         f.write(f"{key}={value}\n")
                 print("Config saved.")
                 # Reset the timer with the new period
-                if timer is not None:  # Ensure timer is initialized
+                if sensor_timer is not None:  # Ensure timer is initialized
                     timer_period = int(config.get("period", 60000))  # Update timer_period
-                    timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)  # Reset the timer
+                    sensor_timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)  # Reset the timer
             else:
                 print("Empty response text. Nothing to save.")
         else:
@@ -233,7 +233,7 @@ def sync_time():
         print("Failed to sync time:", e)
 
 def send_to_ngrok(temp, humidity, timestamp):
-    ngrok_url = "http://api.nahsbyte.my.id/sensor/firebase/history"
+    api_url = "http://api.nahsbyte.my.id/sensor/firebase/history"
     data = {
         "timestamp": timestamp,
         "temperature": temp,
@@ -243,11 +243,11 @@ def send_to_ngrok(temp, humidity, timestamp):
     
     try:
         response = urequests.post(
-            ngrok_url,
+            api_url,
             headers=headers,
             data=ujson.dumps(data)
         )
-        print(f"Data sent to ngrok: {data}, Status: {response.status_code}")
+        print(f"Data sent to API: {data}, Status: {response.status_code}")
         response.close()
     except Exception as e:
         print(f"Failed to send to ngrok: {e}")
