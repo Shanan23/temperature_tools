@@ -9,6 +9,16 @@ from fuzzy_logic import fuzzy_tsukamoto
 from device_control import control_device_fuzzy, relay
 from web_server import start_webserver
 import ntptime  # Importing ntptime to fix the synchronization issue
+
+def get_epoch_time():
+    try:
+        ntp_time = ntptime.time()
+        # Convert NTP time (seconds since 1900-01-01) to Unix time (milliseconds since 1970-01-01)
+        unix_time = (ntp_time - 2208988800) * 1000
+        return int(unix_time)
+    except Exception as e:
+        print(f"Failed to get time from ntptime: {e}")
+        return 0  # fallback epoch time
 import urequests  # Importing urequests for HTTP requests
 import ujson  # Importing ujson for JSON handling
 import gc  # Importing garbage collector
@@ -32,9 +42,9 @@ ssid = config.get("ssid")
 password = config.get("password")
 ipAddress = ""
 isShowSSID = True
-manual_temp = config.get("manual_temp", 0)
-manual_humidity = config.get("manual_humidity", 0)
-is_periodic_sensor = config.get("is_periodic_sensor", "false").lower() == "true"
+manual_temp = int(config.get("manual_temp", 0))
+manual_humidity = int(config.get("manual_humidity", 0))
+is_periodic_sensor = config.get("is_periodic_sensor", "False") == "True"
 
 try:
     timer_period = int(config.get("period", 10000))  # Increased timer period to reduce memory usage
@@ -96,10 +106,25 @@ def periodic_read(t):
     if not stop_script:  # Check if the script should continue running
         gc.collect()  # Trigger garbage collection to free up memory
         try:
-            temp, humidity = read_sensor()
+            is_periodic_sensor = config.get("is_periodic_sensor", "False") == "True"
+            manual_temp = int(config.get("manual_temp", 0))
+            manual_humidity = int(config.get("manual_humidity", 0))
+            
+            if(is_periodic_sensor == False):
+                temp = manual_temp
+                humidity = manual_humidity
+            else:
+                temp, humidity = read_sensor()
             if temp is not None:
                 print(f"Suhu: {temp}°C, Kelembaban: {humidity}%")
-                heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity)  # Kontrol dengan fuzzy logic
+                
+                # Manual override flags from config
+                manual_humidifier_flag = config.get("manual_humidifier", "False") == "True"
+                manual_heater_flag = config.get("manual_heater", "False") == "True"
+                manual_fan_flag = config.get("manual_fan", "False") == "True"
+                
+                heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity, manual_humidifier_flag, manual_heater_flag, manual_fan_flag)  # Kontrol dengan fuzzy logic
+                
                 print(f"Heater Value: {heater_val}, Fan Value: {fan_val}, Humidifier Value: {humidifier_val}")
                 line3 = f"HV: {heater_val} FV: {fan_val} HV: {humidifier_val}"  # Shortened variable names for display
                 line4 = "IP: " + ipAddress
@@ -110,9 +135,9 @@ def periodic_read(t):
                 if lcd is not None:  # Only update LCD if initialized
                     display_message(temp, humidity, line3, line4)  # Perbarui tampilan LCD
                 fetch_api_config()
-                if(is_periodic_sensor):
-                    print("Sending periodic sensor data to API")
-                    send_to_api(temp, humidity, ntptime.time(), is_periodic_sensor)  # Send data to ngrok endpoint
+                # if(is_periodic_sensor):
+                #     print("Sending periodic sensor data to API")
+                send_to_api(temp, humidity, get_epoch_time(), is_periodic_sensor)  # Send data to ngrok endpoint
             else:
                 print("Failed to read sensor")
                 line4 = "IP: " + ipAddress
@@ -236,7 +261,7 @@ def setup_ap_mode():
 def sync_time():
     try:
         ntptime.settime()
-        print("Time synchronized ")
+        print("Time synchronized")
     except Exception as e:
         print("Failed to sync time:", e)
 
@@ -246,7 +271,6 @@ def send_to_api(temp, humidity, timestamp, is_periodic_sensor=False):
         "timestamp": timestamp,
         "temperature": temp,
         "humidity": humidity,
-        "is_periodic_sensor": is_periodic_sensor,
         "manual_temp": manual_temp,
         "manual_humidity": manual_humidity
     }
@@ -319,7 +343,7 @@ if __name__ == "__main__":
 
     # Initialize both timers with different periods
     sensor_timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)
-    config_timer.init(period=60000, mode=Timer.PERIODIC, callback=periodic_fetch_config)  # 1 minute interval
+    config_timer.init(period=5000, mode=Timer.PERIODIC, callback=periodic_fetch_config)  # 1 minute interval
     gc.collect()  # Trigger garbage collection after setting up the timers
     
     # Add a mechanism to handle the stopScript command

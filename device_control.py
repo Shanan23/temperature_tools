@@ -5,8 +5,16 @@ heater_relay = Pin(12, Pin.OUT)  # Mocked D6 relay 2
 fan_relay = Pin(13, Pin.OUT)  # Mocked D7 relay 3
 humidifier_relay = Pin(15, Pin.OUT)  # Mocked D8 relay 4
 
-def control_device_fuzzy(temp, humidity):
-    heater_val, fan_val, humidifier_val = fuzzy_tsukamoto(temp, humidity)
+def control_device_fuzzy(temp, humidity, manual_humidifier_flag, manual_heater_flag, manual_fan_flag):
+    if manual_humidifier_flag or manual_heater_flag or manual_fan_flag:
+        print("Manual control mode activated.")
+        # If any manual control flag is set, use manual control
+        heater_val = 100 if manual_heater_flag else 0
+        fan_val = 100 if manual_fan_flag else 0
+        humidifier_val = 100 if manual_humidifier_flag else 0
+    else: 
+        print("Automatic control mode activated.")
+        heater_val, fan_val, humidifier_val = fuzzy_tsukamoto(temp, humidity)
     
     if heater_val == 100:
         heater_relay.on()

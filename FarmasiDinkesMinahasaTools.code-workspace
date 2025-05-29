@@ -4,12 +4,8 @@
 			"path": "."
 		},
 		{
-			"name": "serial://dev/tty.usbserial-11130",
-			"uri": "serial:///dev/tty.usbserial-11130/"
-		},
-		{
-			"name": "serial://dev/tty.usbserial-11130",
-			"uri": "serial://%2fdev%2ftty.usbserial-11130/"
+			"name": "serial:/COM7",
+			"uri": "serial://com7"
 		}
 	],
 	"settings": {}
