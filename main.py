@@ -52,6 +52,8 @@ except ValueError:
     print("Invalid value for period in configuration. Using default of 30000.")
     timer_period = 10000
 
+current_timer_period = timer_period  # Track current timer period
+
 # Initialize I2C (SDA, SCL pins)
 i2c = I2C(scl=Pin(I2C_SCL), sda=Pin(I2C_SDA), freq=I2C_FREQ)
 
@@ -177,7 +179,7 @@ def save_wifi_config(ssid, password):
 
 # Fungsi koneksi WiFi
 def fetch_api_config():
-    global config
+    global config, current_timer_period
     api_url = "http://api.nahsbyte.my.id/sensor/firebase/config"
 
     headers = {
@@ -199,12 +201,14 @@ def fetch_api_config():
                     for key, value in config.items():
                         f.write(f"{key}={value}\n")
                 print("Config saved.")
-                # Reset the timer with the new period
-                if sensor_timer is not None:  # Ensure timer is initialized
-                    timer_period = int(config.get("period", 60000))  # Update timer_period
-                    sensor_timer.init(period=timer_period, mode=Timer.PERIODIC, callback=periodic_read)  # Reset the timer
-                # Update global config dictionary with new values
+                # Reset the timer with the new period only if changed
+                new_timer_period = int(config.get("period", 60000))
+                print(f"New timer period from config: {new_timer_period}")
                 config = config
+                if sensor_timer is not None and new_timer_period != current_timer_period:  # Ensure timer is initialized and period changed
+                    sensor_timer.init(period=new_timer_period, mode=Timer.PERIODIC, callback=periodic_read)  # Reset the timer
+                    current_timer_period = new_timer_period  # Update current timer period
+                # Update global config dictionary with new values
             else:
                 print("Empty response text. Nothing to save.")
         else:

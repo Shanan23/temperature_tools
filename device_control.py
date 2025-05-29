@@ -17,19 +17,19 @@ def control_device_fuzzy(temp, humidity, manual_humidifier_flag, manual_heater_f
         heater_val, fan_val, humidifier_val = fuzzy_tsukamoto(temp, humidity)
     
     if heater_val == 100:
-        heater_relay.on()
+        heater_relay.value(0)  # Active low relay ON
     else:
-        heater_relay.off()
+        heater_relay.value(1)  # Active low relay OFF
     
     if fan_val == 100:
-        fan_relay.on()
+        fan_relay.value(0)  # Active low relay ON
     else:
-        fan_relay.off()
+        fan_relay.value(1)  # Active low relay OFF
     
     if humidifier_val == 100:
-        humidifier_relay.on()
+        humidifier_relay.value(0)  # Active low relay ON
     else:
-        humidifier_relay.off()
+        humidifier_relay.value(1)  # Active low relay OFF
 
     return heater_val, fan_val, humidifier_val
 
@@ -41,16 +41,16 @@ def relay(device_name, action):
     """
     if device_name == 'heater':
         if action == 'on':
-            heater_relay.on()
+            heater_relay.value(0)  # Active low relay ON
         elif action == 'off':
-            heater_relay.off()
+            heater_relay.value(1)  # Active low relay OFF
     elif device_name == 'fan':
         if action == 'on':
-            fan_relay.on()
+            fan_relay.value(0)  # Active low relay ON
         elif action == 'off':
-            fan_relay.off()
+            fan_relay.value(1)  # Active low relay OFF
     elif device_name == 'humidifier':
         if action == 'on':
-            humidifier_relay.on()
+            humidifier_relay.value(0)  # Active low relay ON
         elif action == 'off':
-            humidifier_relay.off()
+            humidifier_relay.value(1)  # Active low relay OFF
