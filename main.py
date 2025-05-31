@@ -4,7 +4,7 @@ import ssd1306
 from machine import I2C, Pin, Timer, reset
 from time import sleep_ms
 from sensor_handler import read_sensor
-from device_control import heater_relay, fan_relay, humidifier_relay
+from device_control import heater_relay, fan_relay, humidifier_relay, backup_relay
 from fuzzy_logic import fuzzy_tsukamoto
 from device_control import control_device_fuzzy, relay
 from web_server import start_webserver
@@ -125,8 +125,9 @@ def periodic_read(t):
                 manual_humidifier_flag = config.get("manual_humidifier", False) == True
                 manual_heater_flag = config.get("manual_heater", False) == True
                 manual_fan_flag = config.get("manual_fan", False) == True
+                manual_backup_flag = config.get("manual_backup", False) == True
                 
-                heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity, manual_humidifier_flag, manual_heater_flag, manual_fan_flag)  # Kontrol dengan fuzzy logic
+                heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity, manual_humidifier_flag, manual_heater_flag, manual_fan_flag,manual_backup_flag)  # Kontrol dengan fuzzy logic
                 
                 print(f"Heater Value: {heater_val}, Fan Value: {fan_val}, Humidifier Value: {humidifier_val}")
                 line3 = f"HV: {heater_val} FV: {fan_val} HV: {humidifier_val}"  # Shortened variable names for display
