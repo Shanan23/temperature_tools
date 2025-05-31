@@ -2,7 +2,7 @@ import dht
 import time
 from machine import Pin
 
-sensor = dht.DHT11(Pin(14))
+sensor = dht.DHT11(Pin(2))
 
 def read_sensor():
     try:

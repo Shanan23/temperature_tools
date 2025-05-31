@@ -1,9 +1,9 @@
 from machine import Pin
 from fuzzy_logic import fuzzy_tsukamoto
 
-heater_relay = Pin(12, Pin.OUT)  # Mocked D6 relay 2
-fan_relay = Pin(13, Pin.OUT)  # Mocked D7 relay 3
-humidifier_relay = Pin(15, Pin.OUT)  # Mocked D8 relay 4
+fan_relay = Pin(14, Pin.OUT)  # Mocked D5 relay 2
+heater_relay = Pin(12, Pin.OUT)  # Mocked D6 relay 3
+humidifier_relay = Pin(13, Pin.OUT)  # Mocked D7 relay 4
 
 def control_device_fuzzy(temp, humidity, manual_humidifier_flag, manual_heater_flag, manual_fan_flag):
     if manual_humidifier_flag or manual_heater_flag or manual_fan_flag:

@@ -6,6 +6,10 @@
 		{
 			"name": "serial:/COM7",
 			"uri": "serial://com7"
+		},
+		{
+			"name": "serial:/COM3",
+			"uri": "serial://com3/"
 		}
 	],
 	"settings": {}

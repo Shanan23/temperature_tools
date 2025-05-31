@@ -44,7 +44,7 @@ ipAddress = ""
 isShowSSID = True
 manual_temp = int(config.get("manual_temp", 0))
 manual_humidity = int(config.get("manual_humidity", 0))
-is_periodic_sensor = config.get("is_periodic_sensor", "False") == "True"
+is_periodic_sensor = config.get("is_periodic_sensor", False) == True
 
 try:
     timer_period = int(config.get("period", 10000))  # Increased timer period to reduce memory usage
@@ -108,7 +108,7 @@ def periodic_read(t):
     if not stop_script:  # Check if the script should continue running
         gc.collect()  # Trigger garbage collection to free up memory
         try:
-            is_periodic_sensor = config.get("is_periodic_sensor", "False") == "True"
+            is_periodic_sensor = config.get("is_periodic_sensor", False) == True
             manual_temp = int(config.get("manual_temp", 0))
             manual_humidity = int(config.get("manual_humidity", 0))
             
@@ -117,13 +117,14 @@ def periodic_read(t):
                 humidity = manual_humidity
             else:
                 temp, humidity = read_sensor()
+            
             if temp is not None:
                 print(f"Suhu: {temp}°C, Kelembaban: {humidity}%")
                 
                 # Manual override flags from config
-                manual_humidifier_flag = config.get("manual_humidifier", "False") == "True"
-                manual_heater_flag = config.get("manual_heater", "False") == "True"
-                manual_fan_flag = config.get("manual_fan", "False") == "True"
+                manual_humidifier_flag = config.get("manual_humidifier", False) == True
+                manual_heater_flag = config.get("manual_heater", False) == True
+                manual_fan_flag = config.get("manual_fan", False) == True
                 
                 heater_val, fan_val, humidifier_val = control_device_fuzzy(temp, humidity, manual_humidifier_flag, manual_heater_flag, manual_fan_flag)  # Kontrol dengan fuzzy logic
                 
